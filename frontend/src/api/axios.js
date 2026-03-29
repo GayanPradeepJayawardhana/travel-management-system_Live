@@ -19,6 +19,13 @@ API.interceptors.request.use((req) => {
 API.interceptors.response.use(
   (response) => response,
   (error) => {
+    console.error("API Error:", {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+      url: error.config?.url
+    });
+    
     if (error.response?.status === 401) {
       // Token expired or invalid, clear user
       localStorage.removeItem("user");
