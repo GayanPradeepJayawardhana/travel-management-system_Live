@@ -62,30 +62,24 @@ const server = app.listen(PORT, "0.0.0.0", () => {
 });
 
 // Graceful shutdown
-process.on("SIGTERM", () => {
-  console.log("SIGTERM received, shutting down gracefully");
+const gracefulShutdown = () => {
+  console.log("Shutting down gracefully...");
+  
+  // Force exit after 10 seconds
+  const shutdownTimeout = setTimeout(() => {
+    console.error("Forced shutdown after timeout");
+    process.exit(1);
+  }, 10000);
+
   server.close(() => {
+    clearTimeout(shutdownTimeout);
     console.log("Server closed");
     mongoose.connection.close(false, () => {
       console.log("MongoDB connection closed");
       process.exit(0);
     });
   });
-});
+};
 
-process.on("SIGINT", () => {
-  console.log("SIGINT received, shutting down gracefully");
-  server.close(() => {
-    console.log("Server closed");
-    mongoose.connection.close(false, () => {
-      console.log("MongoDB connection closed");
-      process.exit(0);
-    });
-  });
-});
-
-// Handle unhandled rejections
-process.on("unhandledRejection", (err) => {
-  console.error("Unhandled rejection:", err);
-  process.exit(1);
-});
+process.on("SIGTERM", gracefulShutdown);
+process.on("SIGINT", gracefulShutdown);
