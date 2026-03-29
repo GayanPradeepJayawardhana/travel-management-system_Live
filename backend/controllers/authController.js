@@ -7,6 +7,16 @@ export const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
+    // Check if user exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already registered" });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = new User({
@@ -17,7 +27,7 @@ export const register = async (req, res) => {
 
     await user.save();
 
-    res.json({ message: "User registered" });
+    res.json({ message: "User registered successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
