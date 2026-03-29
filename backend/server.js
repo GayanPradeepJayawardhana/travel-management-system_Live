@@ -2,6 +2,9 @@ import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import dns from "node:dns";
+
+dns.setServers(["1.1.1.1", "8.8.8.8"]);
 
 dotenv.config();
 
@@ -47,20 +50,19 @@ app.get("/health", (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-let server;
 
-// Connect MongoDB and THEN start server
+// START SERVER IMMEDIATELY (don't wait for MongoDB)
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+// Connect MongoDB in background (non-blocking)
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log("✓ MongoDB connected successfully");
-
-    server = app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on port ${PORT}`);
-    });
   })
   .catch((err) => {
     console.error("✗ MongoDB connection error:", err.message);
-    process.exit(1);
   });
 
 // Graceful shutdown function
