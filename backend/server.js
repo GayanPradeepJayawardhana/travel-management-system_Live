@@ -2,10 +2,13 @@ import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import dns from "node:dns"
-dns.setServers(["1.1.1.1","8.8.8.8"])
+import dns from "node:dns";
+
+dns.setServers(["1.1.1.1", "8.8.8.8"]);
+
 dotenv.config();
 
+// Debug logs
 console.log("Environment Variables Loaded:");
 console.log("MONGO_URI:", process.env.MONGO_URI ? "✓ Set" : "✗ Missing");
 console.log("PORT:", process.env.PORT || 5000);
@@ -28,58 +31,75 @@ app.use(cors({
   ].filter(Boolean),
   credentials: true
 }));
+
 app.use(express.json());
 
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/bookings", bookingRoutes);
 
-
-// Test route
+// Root route (IMPORTANT for Railway health check)
 app.get("/", (req, res) => {
-  res.send("Server is running...");
+  res.status(200).send("OK");
 });
 
-// Health check for Railway
+// Health check route
 app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
+  res.status(200).json({ status: "ok" });
 });
 
-// MongoDB connection with better error handling
+const PORT = process.env.PORT || 5000;
+let server;
+
+// Connect MongoDB and THEN start server
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log("✓ MongoDB connected successfully");
+
+    server = app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on port ${PORT}`);
+    });
   })
   .catch((err) => {
     console.error("✗ MongoDB connection error:", err.message);
     process.exit(1);
   });
 
-// Start server
-const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
-// Graceful shutdown
+// Graceful shutdown function
 const gracefulShutdown = () => {
   console.log("Shutting down gracefully...");
-  
-  // Force exit after 10 seconds
-  const shutdownTimeout = setTimeout(() => {
-    console.error("Forced shutdown after timeout");
+
+  const timeout = setTimeout(() => {
+    console.error("Forced shutdown");
     process.exit(1);
   }, 10000);
 
-  server.close(() => {
-    clearTimeout(shutdownTimeout);
-    console.log("Server closed");
-    mongoose.connection.close(false, () => {
-      console.log("MongoDB connection closed");
-      process.exit(0);
+  if (server) {
+    server.close(() => {
+      clearTimeout(timeout);
+      console.log("Server closed");
+
+      mongoose.connection.close(false, () => {
+        console.log("MongoDB connection closed");
+        process.exit(0);
+      });
     });
-  });
+  }
 };
 
-process.on("SIGTERM", gracefulShutdown);
-process.on("SIGINT", gracefulShutdown);
+// Handle termination signals
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received from hosting platform");
+  gracefulShutdown();
+});
+
+process.on("SIGINT", () => {
+  console.log("SIGINT received");
+  gracefulShutdown();
+});
+
+// Prevent crash on unhandled errors
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled rejection:", err);
+});
